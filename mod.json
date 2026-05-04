@@ -1,0 +1,75 @@
+{
+    "geode": "4.2.0",
+    "gd": {
+        "win": "2.2074",
+        "mac": "2.2074",
+        "android": "2.2074"
+    },
+    "id": "MacTFPS",
+    "name": "MacTFPC,
+    "version": "1.0.0",
+    "developer": "SnowySunCode",
+    "description": "Uncaps FPS, boosts TPS, and bypasses V-Sync on Apple Silicon Macs.",
+    "tags": ["performance", "fps", "utility"],
+    "settings": {
+        "target-fps": {
+            "name": "Target FPS",
+            "description": "Target frame rate. Set 0 for unlimited.",
+            "type": "int",
+            "default": 240,
+            "min": 0,
+            "max": 1000,
+            "control": {
+                "slider": true,
+                "slider-step": 10,
+                "arrows": true,
+                "arrow-step": 10,
+                "big-arrow-step": 60,
+                "input": true
+            }
+        }c,
+        "tps-multiplier": {
+            "name": "TPS Multiplier",
+            "description": "Physics ticks per second multiplier (1x = 240 TPS, 2x = 480 TPS). Higher values improve physics accuracy at high FPS.",
+            "type": "int",
+            "default": 1,
+            "min": 1,
+            "max": 8,
+            "control": {
+                "slider": true,
+                "slider-step": 1,
+                "arrows": true,
+                "input": true
+            }
+        },
+        "disable-vsync": {
+            "name": "Disable V-Sync",
+            "description": "Force-disables V-Sync. On Apple Silicon Macs this bypasses the OS-level display sync lock.",
+            "type": "bool",
+            "default": true
+        },
+        "vsync-persistent": {
+            "name": "Keep V-Sync Disabled",
+            "description": "Re-applies V-Sync bypass every frame (prevents the game from re-enabling it). macOS only.",
+            "type": "bool",
+            "default": true,
+            "platforms": ["mac"]
+        },
+        "show-fps-counter": {
+            "name": "Show FPS Counter",
+            "description": "Display a real-time FPS counter on screen.",
+            "type": "bool",
+            "default": true
+        },
+        "fps-counter-position": {
+            "name": "FPS Counter Position",
+            "description": "Where to display the FPS counter.",
+            "type": "string",
+            "default": "Top Left",
+            "one-of": ["Top Left", "Top Right", "Bottom Left", "Bottom Right"]
+        }
+    },
+    "links": {
+        "source": "https://github.com/yourname/fps-booster"
+    }
+}
