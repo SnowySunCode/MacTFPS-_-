@@ -2,21 +2,20 @@
 #include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/AppDelegate.hpp>
-#include <Geode/ui/GeodeUI.hpp>
 
-// ── macOS-specific V-Sync headers ──────────────────────────────────────────
+// ── macOS-specific V-Sync headers ─────────────────────────────────────────
 #ifdef GEODE_IS_MACOS
-  #include <OpenGL/OpenGL.h>    // CGLGetCurrentContext, CGLSetParameter
+  #include <OpenGL/OpenGL.h>
   #include <OpenGL/CGLTypes.h>
   #include <OpenGL/CGLCurrent.h>
 #endif
-// ───────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────────
 
 using namespace geode::prelude;
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  Helper – FPS overlay label
-// ══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+//  FPS overlay
+// ═════════════════════════════════════════════════════════════════════════════
 
 static CCLabelBMFont* s_fpsLabel     = nullptr;
 static float          s_fpsTimer     = 0.f;
@@ -24,7 +23,9 @@ static int            s_fpsCount     = 0;
 static float          s_displayedFPS = 0.f;
 
 static void ensureFPSLabel() {
-    if (!Mod::get()->getSettingValue<bool>("show-fps-counter")) {
+    bool show = Mod::get()->getSettingValue<bool>("show-fps-counter");
+
+    if (!show) {
         if (s_fpsLabel) {
             s_fpsLabel->removeFromParent();
             s_fpsLabel = nullptr;
@@ -37,81 +38,73 @@ static void ensureFPSLabel() {
 
     if (!s_fpsLabel || !s_fpsLabel->getParent()) {
         s_fpsLabel = CCLabelBMFont::create("FPS: --", "bigFont.fnt");
+        if (!s_fpsLabel) return;
         s_fpsLabel->setScale(0.45f);
         s_fpsLabel->setOpacity(220);
         s_fpsLabel->setZOrder(999);
         scene->addChild(s_fpsLabel);
     }
 
-    // Position
+    // Позиция — верхний левый угол
     auto winSize = CCDirector::sharedDirector()->getWinSize();
-    const float pad = 6.f;
-    auto pos = Mod::get()->getSettingValue<std::string>("fps-counter-position");
-
-    if (pos == "Top Left")
-        s_fpsLabel->setPosition({ pad + s_fpsLabel->getContentWidth() * 0.45f * 0.5f,
-                                   winSize.height - pad - s_fpsLabel->getContentHeight() * 0.45f * 0.5f });
-    else if (pos == "Top Right")
-        s_fpsLabel->setPosition({ winSize.width - pad - s_fpsLabel->getContentWidth() * 0.45f * 0.5f,
-                                   winSize.height - pad - s_fpsLabel->getContentHeight() * 0.45f * 0.5f });
-    else if (pos == "Bottom Left")
-        s_fpsLabel->setPosition({ pad + s_fpsLabel->getContentWidth() * 0.45f * 0.5f,
-                                   pad + s_fpsLabel->getContentHeight() * 0.45f * 0.5f });
-    else  // Bottom Right
-        s_fpsLabel->setPosition({ winSize.width - pad - s_fpsLabel->getContentWidth() * 0.45f * 0.5f,
-                                   pad + s_fpsLabel->getContentHeight() * 0.45f * 0.5f });
+    const float pad = 8.f;
+    float w = s_fpsLabel->getContentWidth()  * 0.45f;
+    float h = s_fpsLabel->getContentHeight() * 0.45f;
+    s_fpsLabel->setPosition({ pad + w * 0.5f, winSize.height - pad - h * 0.5f });
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
 //  V-Sync bypass (macOS / Apple Silicon)
-// ══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
 
 #ifdef GEODE_IS_MACOS
 static void disableVSync() {
-    // CGL path – works on both Intel OpenGL and the compatibility layer on M1/M2/M3
     CGLContextObj ctx = CGLGetCurrentContext();
     if (ctx) {
-        GLint swapInterval = 0;
-        CGLSetParameter(ctx, kCGLCPSwapInterval, &swapInterval);
+        GLint zero = 0;
+        CGLSetParameter(ctx, kCGLCPSwapInterval, &zero);
     }
 }
 #endif
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  CCDirector hook – FPS cap + V-Sync bypass per-frame
-// ══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+//  Утилита: применить нужный интервал кадра
+// ═════════════════════════════════════════════════════════════════════════════
+
+static void applyFPS() {
+    int64_t fps = Mod::get()->getSettingValue<int64_t>("target-fps");
+    if (fps <= 0)
+        CCDirector::sharedDirector()->setAnimationInterval(0.00025); // ~4000 FPS потолок
+    else
+        CCDirector::sharedDirector()->setAnimationInterval(1.0 / static_cast<double>(fps));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CCDirector hook – FPS cap + V-Sync bypass каждый кадр
+// ═════════════════════════════════════════════════════════════════════════════
 
 class $modify(FPSDirector, CCDirector) {
 
-    // Called by Cocos2d every time it wants to change the animation interval.
-    // We intercept and enforce our own target.
+    // Перехватываем любую попытку игры сменить интервал
     void setAnimationInterval(double interval) {
-        auto fps = Mod::get()->getSettingValue<int64_t>("target-fps");
-
-        if (fps <= 0) {
-            // Unlimited – use a very small interval (≈ 4000 FPS cap ceiling)
-            CCDirector::setAnimationInterval(0.00025);
-        } else {
-            CCDirector::setAnimationInterval(1.0 / static_cast<double>(fps));
-        }
+        applyFPS();
     }
 
-    // Main render loop – runs every frame.
     void drawScene() {
 
-// ── macOS: persistently kill V-Sync ────────────────────────────────────────
 #ifdef GEODE_IS_MACOS
         if (Mod::get()->getSettingValue<bool>("disable-vsync") &&
             Mod::get()->getSettingValue<bool>("vsync-persistent")) {
             disableVSync();
         }
 #endif
-// ───────────────────────────────────────────────────────────────────────────
 
         CCDirector::drawScene();
 
-        // ── FPS counter update ──────────────────────────────────────────────
+        // ── FPS счётчик ────────────────────────────────────────────────────
         float dt = CCDirector::sharedDirector()->getDeltaTime();
+        if (dt <= 0.f) return;
+
         s_fpsTimer += dt;
         s_fpsCount++;
 
@@ -127,18 +120,18 @@ class $modify(FPSDirector, CCDirector) {
                 );
             }
         } else {
-            ensureFPSLabel();  // keep label parented after scene changes
+            ensureFPSLabel();
         }
     }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  PlayLayer hook – TPS (physics ticks) multiplier
+// ═════════════════════════════════════════════════════════════════════════════
+//  PlayLayer hook – TPS multiplier
 //
-//  GD 2.2 runs physics at a fixed 240 Hz step.  We call the physics updater
-//  N extra times per visual frame with a proportionally scaled dt so that
-//  the simulation stays correct while running at a higher tick rate.
-// ══════════════════════════════════════════════════════════════════════════════
+//  GD 2.2 работает на фиксированных 240 тиках/сек.
+//  Мы дробим один визуальный кадр на N равных физических подшагов,
+//  пропорционально уменьшая dt — скорость игры не меняется.
+// ═════════════════════════════════════════════════════════════════════════════
 
 class $modify(TPSPlayLayer, PlayLayer) {
 
@@ -152,31 +145,23 @@ class $modify(TPSPlayLayer, PlayLayer) {
             return;
         }
 
-        // Split the frame into `mult` equal sub-steps.
-        // The first call uses the actual Cocos dt; remaining calls use
-        // a fixed physics step to avoid cascade errors.
         float subDt = dt / static_cast<float>(mult);
-
         for (int i = 0; i < mult; ++i) {
             PlayLayer::update(subDt);
         }
     }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  AppDelegate hook – disable V-Sync once at startup (non-persistent path)
-// ══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+//  AppDelegate hook – применяем настройки сразу при старте
+// ═════════════════════════════════════════════════════════════════════════════
 
 class $modify(FPSAppDelegate, AppDelegate) {
+
     bool applicationDidFinishLaunching() {
         bool result = AppDelegate::applicationDidFinishLaunching();
 
-        // Apply target FPS immediately after the Cocos2d director starts.
-        auto fps = Mod::get()->getSettingValue<int64_t>("target-fps");
-        if (fps <= 0)
-            CCDirector::sharedDirector()->setAnimationInterval(0.00025);
-        else
-            CCDirector::sharedDirector()->setAnimationInterval(1.0 / static_cast<double>(fps));
+        applyFPS();
 
 #ifdef GEODE_IS_MACOS
         if (Mod::get()->getSettingValue<bool>("disable-vsync")) {
@@ -188,29 +173,38 @@ class $modify(FPSAppDelegate, AppDelegate) {
     }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  Mod lifecycle – listen for setting changes at runtime
-// ══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+//  Мод загружен – слушаем изменения настроек в реальном времени
+// ═════════════════════════════════════════════════════════════════════════════
 
 $on_mod(Loaded) {
-    // Re-apply FPS cap when the user changes "target-fps" in the mod settings.
-    Mod::get()->addCustomSetting<int64_t>("target-fps", 240);
 
     listenForSettingChanges<int64_t>("target-fps", [](int64_t fps) {
-        if (fps <= 0)
-            CCDirector::sharedDirector()->setAnimationInterval(0.00025);
-        else
-            CCDirector::sharedDirector()->setAnimationInterval(1.0 / static_cast<double>(fps));
+        applyFPS();
+        log::info("[MacTFPS] Target FPS → {}", fps <= 0 ? "Unlimited" : std::to_string(fps));
+    });
 
-        log::info("[FPS Booster] Target FPS changed → {}", fps <= 0 ? "Unlimited" : std::to_string(fps));
+    listenForSettingChanges<int64_t>("tps-multiplier", [](int64_t mult) {
+        log::info("[MacTFPS] TPS multiplier → {}x ({}  TPS)", mult, mult * 240);
     });
 
 #ifdef GEODE_IS_MACOS
     listenForSettingChanges<bool>("disable-vsync", [](bool enabled) {
         if (enabled) disableVSync();
-        log::info("[FPS Booster] V-Sync bypass: {}", enabled ? "ON" : "OFF");
+        log::info("[MacTFPS] V-Sync bypass: {}", enabled ? "ON" : "OFF");
     });
 #endif
 
-    log::info("[FPS Booster] Mod loaded successfully.");
+    listenForSettingChanges<bool>("show-fps-counter", [](bool enabled) {
+        if (!enabled && s_fpsLabel) {
+            s_fpsLabel->removeFromParent();
+            s_fpsLabel = nullptr;
+        }
+        log::info("[MacTFPS] FPS counter: {}", enabled ? "ON" : "OFF");
+    });
+
+    log::info("[MacTFPS] Mod loaded! FPS={}, TPS={}x",
+        Mod::get()->getSettingValue<int64_t>("target-fps"),
+        Mod::get()->getSettingValue<int64_t>("tps-multiplier")
+    );
 }
