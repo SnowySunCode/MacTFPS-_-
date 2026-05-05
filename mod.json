@@ -1,11 +1,11 @@
 {
-    "geode": "4.2.0",
+    "geode": "5.7.1",
     "gd": {
         "win": "2.2081",
         "mac": "2.2081",
         "android": "2.2081"
     },
-    "id": "MacTFPS",
+    "id": "snowysuncode.mactfps",
     "name": "MacTFPS",
     "version": "1.0.0",
     "developer": "SnowySunCode",
@@ -27,7 +27,7 @@
                 "big-arrow-step": 60,
                 "input": true
             }
-        }c,
+        },
         "tps-multiplier": {
             "name": "TPS Multiplier",
             "description": "Physics ticks per second multiplier (1x = 240 TPS, 2x = 480 TPS). Higher values improve physics accuracy at high FPS.",
@@ -70,6 +70,6 @@
         }
     },
     "links": {
-        "source": "https://github.com/yourname/fps-booster"
+        "source": "https://github.com/SnowySunCode/MacTFPS"
     }
 }
