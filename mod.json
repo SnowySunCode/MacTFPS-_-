@@ -1,12 +1,12 @@
 {
     "geode": "4.2.0",
     "gd": {
-        "win": "2.2074",
-        "mac": "2.2074",
-        "android": "2.2074"
+        "win": "2.2081",
+        "mac": "2.2081",
+        "android": "2.2081"
     },
     "id": "MacTFPS",
-    "name": "MacTFPC,
+    "name": "MacTFPS",
     "version": "1.0.0",
     "developer": "SnowySunCode",
     "description": "Uncaps FPS, boosts TPS, and bypasses V-Sync on Apple Silicon Macs.",
